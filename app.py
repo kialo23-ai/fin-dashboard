@@ -143,7 +143,7 @@ with st.sidebar:
                             "➕",
                             key=f"add_{row['yf_code']}_{idx}",
                             help=f"添加 {row['name']}",
-                            use_container_width=True,
+                            width='stretch',
                         ):
                             if row["yf_code"] not in st.session_state.watchlist:
                                 st.session_state.watchlist.append(row["yf_code"])
@@ -162,10 +162,10 @@ with st.sidebar:
                 st.code(code, language=None)
             with col2:
                 if st.button("✕", key=f"remove_{i}_{code}",
-                             use_container_width=True):
+                             width='stretch'):
                     st.session_state.watchlist.pop(i)
                     st.rerun()
-        if st.button("🗑️ 清空队列", use_container_width=True, key="clear_queue"):
+        if st.button("🗑️ 清空队列", width='stretch', key="clear_queue"):
             st.session_state.watchlist = []
             st.session_state.last_params = None
             st.rerun()
@@ -180,7 +180,7 @@ with st.sidebar:
             placeholder="AAPL, 0700.HK, 601899.SS",
             key="manual_ticker_input",
         )
-        if st.button("添加到队列", key="add_manual", use_container_width=True):
+        if st.button("添加到队列", key="add_manual", width='stretch'):
             if manual_input:
                 for t in manual_input.split(","):
                     t = t.strip().upper()
@@ -249,7 +249,7 @@ with tab1:
     fig = plot_normalized_comparison(data_dict, mobile_mode=mobile_mode)
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         config={"responsive": True},
         key="chart_normalized",
     )
@@ -265,7 +265,7 @@ with tab2:
     )
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         config={"responsive": True},
         key=f"chart_kline_{selected_ticker}",
     )
@@ -288,7 +288,7 @@ with tab3:
     )
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         config={"responsive": True},
         key=f"chart_ind_{selected_ind}",
     )
@@ -298,7 +298,7 @@ with tab4:
     fig = plot_correlation_heatmap(data_dict, mobile_mode=mobile_mode)
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         config={"responsive": True},
         key="chart_corr",
     )
@@ -323,7 +323,7 @@ with tab5:
             data=df_to_csv_bytes(combined_df),
             file_name="stock_data.csv",
             mime="text/csv",
-            use_container_width=True,
+            width='stretch',
         )
 
     with col_b:
@@ -332,7 +332,7 @@ with tab5:
             data=df_to_excel_bytes(data_dict),
             file_name="stock_analysis.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
         )
 
     with col_c:
@@ -349,9 +349,9 @@ with tab5:
             data=charts_to_html_bytes(charts),
             file_name="analysis_report.html",
             mime="text/html",
-            use_container_width=True,
+            width='stretch',
         )
 
     # 数据预览
     st.subheader("📋 数据预览")
-    st.dataframe(combined_df.tail(50), use_container_width=True)
+    st.dataframe(combined_df.tail(50), width='stretch')
