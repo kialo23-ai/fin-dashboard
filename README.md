@@ -1,4 +1,3 @@
-markdown
 # 金融指标对比分析看板
 
 基于 Streamlit 的金融数据分析工具，支持股票、ETF、期货、债券、加密货币的跨市场指标对比与技术分析。
@@ -67,49 +66,62 @@ python3.11 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
-启动应用
-bash
+```
+
+### 启动应用
+
+```bash
 python -m streamlit run app.py
-浏览器会自动打开 http://localhost:8501。
+```
 
-仓库已包含预生成的代码库文件 data/instrument_master.csv，无需额外步骤。如需更新代码库，见文末「维护代码库」一节。
+浏览器会自动打开 `http://localhost:8501`。
 
-使用说明
-1. 添加标的到分析队列
+> 仓库已包含预生成的代码库文件 `data/instrument_master.csv`，无需额外步骤。如需更新代码库，见文末「维护代码库」一节。
+
+## 使用说明
+
+### 1. 添加标的到分析队列
+
 侧边栏「🔍 搜索并添加股票」支持三种输入方式：
 
-中文名称：紫金矿业、茅台、腾讯、比特币
-
-英文名称：Apple、Tencent、Gold
-
-代码：AAPL、600519、0700.HK、GC=F、BTC-USD
+- **中文名称**：`紫金矿业`、`茅台`、`腾讯`、`比特币`
+- **英文名称**：`Apple`、`Tencent`、`Gold`
+- **代码**：`AAPL`、`600519`、`0700.HK`、`GC=F`、`BTC-USD`
 
 点击结果行的「➕」加入队列。
 
-2. 切换分析视图
+### 2. 切换分析视图
+
 主区域分为 5 个 Tab：
 
-Tab	内容
-📊 归一化对比	多标的归一化价格走势
-🕯️ K线分析	单标的 K 线 + 技术指标多面板
-📉 指标对比	同一指标的多标的横向对比
-🔥 相关性	收益率相关性热力图
-📥 数据导出	CSV / Excel / HTML 报告下载
-3. 移动端使用
+| Tab | 内容 |
+|-----|------|
+| 📊 归一化对比 | 多标的归一化价格走势 |
+| 🕯️ K线分析 | 单标的 K 线 + 技术指标多面板 |
+| 📉 指标对比 | 同一指标的多标的横向对比 |
+| 🔥 相关性 | 收益率相关性热力图 |
+| 📥 数据导出 | CSV / Excel / HTML 报告下载 |
+
+### 3. 移动端使用
+
 手机上访问后，展开侧边栏 → 打开「📱 移动端适配」开关，图表会自动压缩布局。
 
-代码格式说明
-不同市场的代码在 data/instrument_master.csv 中已自动转换为 yfinance 可识别格式：
+## 代码格式说明
 
-市场	原始代码	yfinance 格式
-美股	AAPL	AAPL
-上交所	600519	600519.SS
-深交所	000001	000001.SZ
-港交所	00700	0700.HK
-期货	黄金	GC=F
-加密货币	比特币	BTC-USD
-项目结构
-text
+不同市场的代码在 `data/instrument_master.csv` 中已自动转换为 yfinance 可识别格式：
+
+| 市场 | 原始代码 | yfinance 格式 |
+|------|---------|--------------|
+| 美股 | AAPL | `AAPL` |
+| 上交所 | 600519 | `600519.SS` |
+| 深交所 | 000001 | `000001.SZ` |
+| 港交所 | 00700 | `0700.HK` |
+| 期货 | 黄金 | `GC=F` |
+| 加密货币 | 比特币 | `BTC-USD` |
+
+## 项目结构
+
+```
 fin-dashboard/
 ├── app.py                          # Streamlit 主入口
 ├── modules/
@@ -127,21 +139,21 @@ fin-dashboard/
 │   └── instrument_master.csv       # 本地代码库
 ├── requirements.txt
 └── README.md
-数据源
-yfinance：全球股票、期货、加密货币行情
+```
 
-akshare：A 股、港股列表（可选）
+## 数据源
 
-HuggingFace free-global-stock-ticker-database：全球股票代码库
+- **yfinance**：全球股票、期货、加密货币行情
+- **akshare**：A 股、港股列表（可选）
+- **HuggingFace** `free-global-stock-ticker-database`：全球股票代码库
+- **GitHub** `irachex/open-stock-data`：分交易所代码列表
+- 期货、债券、加密货币：硬编码维护
 
-GitHub irachex/open-stock-data：分交易所代码列表
+## 维护代码库
 
-期货、债券、加密货币：硬编码维护
-
-维护代码库
 如果需要重新生成或更新本地代码库（例如新增交易所、补充别名），依次运行：
 
-bash
+```bash
 # 1. 重新生成基础代码库（约 68,000 条）
 python scripts/build_instrument_master.py
 
@@ -150,42 +162,41 @@ python scripts/add_chinese_aliases.py
 
 # 3. 补充加密货币
 python scripts/add_crypto.py
-生成的文件位于 data/instrument_master.csv。三个脚本均可重复运行，自动去重。
+```
 
-常见问题
-行情拉取失败
+生成的文件位于 `data/instrument_master.csv`。三个脚本均可重复运行，自动去重。
+
+## 常见问题
+
+### 行情拉取失败
+
 Yahoo Finance 对部分地区有网络限制，建议：
 
-使用 curl_cffi 模拟浏览器请求（已在 data_fetcher.py 中配置）
+- 使用 `curl_cffi` 模拟浏览器请求（已在 `data_fetcher.py` 中配置）
+- 或切换到 akshare 数据源（A 股、港股）
 
-或切换到 akshare 数据源（A 股、港股）
+### 搜索不到标的
 
-搜索不到标的
-确认 data/instrument_master.csv 存在
+1. 确认 `data/instrument_master.csv` 存在
+2. 尝试搜索英文名或代码（部分标的只有英文名）
+3. 如需补充中文名，在 `scripts/add_chinese_aliases.py` 的 `ALIASES` 字典中添加后重新运行
 
-尝试搜索英文名或代码（部分标的只有英文名）
+### 部署到 Streamlit Cloud 后代码库为空
 
-如需补充中文名，在 scripts/add_chinese_aliases.py 的 ALIASES 字典中添加后重新运行
+如果 `data/instrument_master.csv` 未提交到仓库，云端首次访问时会提示为空。两种解决方式：
 
-部署到 Streamlit Cloud 后代码库为空
-如果 data/instrument_master.csv 未提交到仓库，云端首次访问时会提示为空。两种解决方式：
+- 将 CSV 提交到仓库（文件较小的情况）
+- 在 Streamlit Cloud 的启动命令中先执行 `scripts/build_instrument_master.py`
 
-将 CSV 提交到仓库（文件较小的情况）
+## 技术栈
 
-在 Streamlit Cloud 的启动命令中先执行 scripts/build_instrument_master.py
+- **Streamlit**：Web 应用框架
+- **yfinance + curl_cffi**：行情数据拉取
+- **pandas / numpy**：数据处理
+- **ta**：技术指标计算
+- **plotly**：交互式图表
+- **openpyxl**：Excel 导出
 
-技术栈
-Streamlit：Web 应用框架
+## License
 
-yfinance + curl_cffi：行情数据拉取
-
-pandas / numpy：数据处理
-
-ta：技术指标计算
-
-plotly：交互式图表
-
-openpyxl：Excel 导出
-
-License
 MIT
