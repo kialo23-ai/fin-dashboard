@@ -3,6 +3,61 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
+def _infer_price_unit(ticker: str) -> str:
+    """根据代码推断计价货币和单位，返回如 'USD/桶'、'HKD/股' 的字符串。"""
+    t = ticker.upper()
+
+    # 期货（优先匹配已知品种）
+    futures_map = {
+        "CL=F": "USD/桶", "BZ=F": "USD/桶",
+        "NG=F": "USD/MMBtu", "HO=F": "USD/加仑", "RB=F": "USD/加仑",
+        "GC=F": "USD/盎司", "SI=F": "USD/盎司",
+        "PL=F": "USD/盎司", "PA=F": "USD/盎司",
+        "HG=F": "USD/磅",
+        "ZC=F": "USc/蒲式耳", "ZS=F": "USc/蒲式耳", "ZW=F": "USc/蒲式耳",
+        "ZM=F": "USD/短吨", "ZL=F": "USc/磅",
+        "KC=F": "USc/磅", "SB=F": "USc/磅",
+        "CC=F": "USD/吨", "CT=F": "USc/磅",
+        "ZN=F": "USD/点", "ZB=F": "USD/点",
+        "ZF=F": "USD/点", "ZT=F": "USD/点",
+        "ES=F": "USD/点", "NQ=F": "USD/点",
+        "YM=F": "USD/点", "RTY=F": "USD/点",
+    }
+    if t in futures_map:
+        return futures_map[t]
+    if t.endswith("=F"):
+        return "USD/合约"
+
+    # 加密货币
+    if t.endswith("-USD"):
+        return "USD/枚"
+
+    # 股票（按交易所后缀）
+    if t.endswith((".SS", ".SZ", ".BJ")):
+        return "CNY/股"
+    if t.endswith(".HK"):
+        return "HKD/股"
+    if t.endswith(".T"):
+        return "JPY/股"
+    if t.endswith((".DE", ".PA", ".AS", ".BR", ".LS", ".MI", ".MC")):
+        return "EUR/股"
+    if t.endswith((".TO", ".V")):
+        return "CAD/股"
+    if t.endswith(".AX"):
+        return "AUD/股"
+    if t.endswith((".KS", ".KQ")):
+        return "KRW/股"
+    if t.endswith((".TW", ".TWO")):
+        return "TWD/股"
+    if t.endswith((".NS", ".BO")):
+        return "INR/股"
+    if t.endswith(".L"):
+        return "GBp/股"   # 伦交所多数以便士（pence）报价
+    if t.endswith(".SI"):
+        return "SGD/股"
+
+    # 默认按美股
+    return "USD/股"
 
 def plot_normalized_comparison(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
     """归一化价格走势对比（基准=100）"""
@@ -250,6 +305,129 @@ def plot_correlation_heatmap(data_dict: dict, mobile_mode: bool = False) -> go.F
             b=50 if mobile_mode else 70,
         ),
         font=dict(size=10 if mobile_mode else 12),
+        autosize=True,
+    )
+    return fig
+
+def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
+    """
+    MA5 双 Y 轴对比。
+    直接基于原始收盘价计算 5 日均线，不做汇率换算。
+    量级最大的标的放左轴，其余放右轴；轴标题标注计价单位。
+    """
+    fig = go.Figure()
+
+    # 计算每个标的的 MA5
+    series_dict = {}
+    for ticker, df in data_dict.items():
+        if df.empty or "Close" not in df.columns:
+            continue
+        ma5 = df["Close"].rolling(5).mean()
+        if ma5.dropna().empty:
+            continue
+        series_dict[ticker] = ma5
+
+    if not series_dict:
+        fig.add_annotation(
+            text="无可用数据", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color="gray"),
+        )
+        return fig
+
+    # 量级最大的放左轴
+    max_values = {t: s.max() for t, s in series_dict.items()}
+    left_ticker = max(max_values, key=max_values.get)
+
+    fig.add_trace(go.Scatter(
+        x=series_dict[left_ticker].index,
+        y=series_dict[left_ticker],
+        name=f"{left_ticker}（左轴）",
+        mode="lines", line=dict(width=2),
+        yaxis="y",
+    ))
+
+    for ticker, s in series_dict.items():
+        if ticker == left_ticker:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s.index, y=s,
+            name=f"{ticker}（右轴）",
+            mode="lines", line=dict(width=2),
+            yaxis="y2",
+        ))
+
+    # ---- 推断左右轴单位 ----
+    left_unit = _infer_price_unit(left_ticker)
+    right_tickers = [t for t in series_dict.keys() if t != left_ticker]
+    right_units = [_infer_price_unit(t) for t in right_tickers]
+
+    if not right_units:
+        right_unit = ""
+    elif len(set(right_units)) == 1:
+        right_unit = right_units[0]
+    else:
+        right_unit = "混合单位"
+
+    if mobile_mode:
+        left_title = left_unit
+        right_title = right_unit
+    else:
+        left_title = f"价格（{left_unit}）"
+        right_title = f"价格（{right_unit}）" if right_unit else "价格"
+
+    # ---- Pearson 相关系数（仅 2 个标的时） ----
+    corr_text = ""
+    if len(series_dict) == 2:
+        try:
+            labels = list(series_dict.keys())
+            df_pair = pd.DataFrame({
+                labels[0]: series_dict[labels[0]],
+                labels[1]: series_dict[labels[1]],
+            }).dropna()
+            if len(df_pair) > 5:
+                c = df_pair.corr().iloc[0, 1]
+                corr_text = f"MA5 Pearson 相关系数: {c:.3f}"
+        except Exception:
+            pass
+
+    if corr_text:
+        fig.add_annotation(
+            text=corr_text,
+            xref="paper", yref="paper", x=0.01, y=1.10,
+            showarrow=False,
+            font=dict(size=11, color="#666"),
+            xanchor="left",
+        )
+
+    fig.update_layout(
+        title=dict(
+            text="MA5 双轴对比",
+            font=dict(size=13 if mobile_mode else 16),
+            x=0.5 if mobile_mode else 0,
+            xanchor="center" if mobile_mode else "left",
+        ),
+        yaxis=dict(title=left_title, side="left"),
+        yaxis2=dict(
+            title=right_title,
+            overlaying="y", side="right", showgrid=False,
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        height=320 if mobile_mode else 500,
+        margin=dict(
+            l=40 if mobile_mode else 70,
+            r=40 if mobile_mode else 70,
+            t=55 if mobile_mode else 90,
+            b=35 if mobile_mode else 60,
+        ),
+        font=dict(size=10 if mobile_mode else 12),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02,
+            xanchor="center" if mobile_mode else "left",
+            x=0.5 if mobile_mode else 0,
+            font=dict(size=9 if mobile_mode else 11),
+        ),
         autosize=True,
     )
     return fig

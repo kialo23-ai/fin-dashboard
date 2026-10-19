@@ -9,6 +9,7 @@ from modules.charts import (
     plot_candlestick_panel,
     plot_indicator_comparison,
     plot_correlation_heatmap,
+    plot_ma5_dual_axis,
 )
 from modules.exporter import df_to_csv_bytes, df_to_excel_bytes, charts_to_html_bytes
 from modules.ticker_search import search_ticker, get_database_stats
@@ -269,6 +270,7 @@ with tab2:
         config={"responsive": True},
         key=f"chart_kline_{selected_ticker}",
     )
+
 # --- Tab3: 指标对比 ---
 with tab3:
     indicator_map = {
@@ -276,23 +278,38 @@ with tab3:
         "MACD": "MACD",
         "ATR(14)": "ATR_14",
         "OBV": "OBV",
+        "MA5双轴对比": "__MA5_DUAL__",
     }
     selected_ind = st.selectbox(
         "选择指标", list(indicator_map.keys()), key="ind_selector"
     )
-    fig = plot_indicator_comparison(
-        data_dict,
-        indicator_map[selected_ind],
-        f"{selected_ind} 多标的对比",
-        mobile_mode=mobile_mode,
-    )
-    st.plotly_chart(
-        fig,
-        width='stretch',
-        config={"responsive": True},
-        key=f"chart_ind_{selected_ind}",
-    )
 
+    if selected_ind == "MA5双轴对比":
+        st.caption(
+            "直接基于原始价格计算 5 日均线，量级大的标的使用左轴，"
+            "其余使用右轴。适合对比量级差异大的资产（如原油 vs 股价）。"
+        )
+        fig = plot_ma5_dual_axis(data_dict, mobile_mode=mobile_mode)
+        st.plotly_chart(
+            fig,
+            width='stretch',
+            config={"responsive": True},
+            key="chart_ma5_dual",
+        )
+    else:
+        fig = plot_indicator_comparison(
+            data_dict,
+            indicator_map[selected_ind],
+            f"{selected_ind} 多标的对比",
+            mobile_mode=mobile_mode,
+        )
+        st.plotly_chart(
+            fig,
+            width='stretch',
+            config={"responsive": True},
+            key=f"chart_ind_{selected_ind}",
+        )
+        
 # --- Tab4: 相关性 ---
 with tab4:
     fig = plot_correlation_heatmap(data_dict, mobile_mode=mobile_mode)
