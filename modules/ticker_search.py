@@ -81,6 +81,9 @@ def search_ticker(query: str, max_results: int = 30) -> pd.DataFrame:
     results["code"] = results["symbol"]
     results["yf_code"] = results["yf_symbol"]
     results["市场"] = results["type"].map(TYPE_MAP).fillna(results["type"])
+    
+    # 新增：按 yf_code 去重，防止同一标的出现多次
+    results = results.drop_duplicates(subset=["yf_code"])
 
     return results[["code", "name", "yf_code", "市场"]].reset_index(drop=True)
 
