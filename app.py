@@ -293,7 +293,11 @@ with tab3:
         st.plotly_chart(
             fig,
             width='stretch',
-            config={"responsive": True},
+            config={
+                "responsive": True,
+                # 隐藏自动缩放按钮，防止它破坏左右轴的比例
+                "modeBarButtonsToRemove": ["autoScale2d"]
+            },
             key="chart_ma5_dual",
         )
     else:
