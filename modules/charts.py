@@ -312,8 +312,7 @@ def plot_correlation_heatmap(data_dict: dict, mobile_mode: bool = False) -> go.F
 def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
     """
     MA5 双 Y 轴对比。
-    直接基于原始收盘价计算 5 日均线，不做汇率换算。
-    量级最大的标的放左轴，其余放右轴；强制左右比例同步以消除视觉失真。
+    强制左右比例同步（按相对波动率），并将相关系数整合到标题避免重叠。
     """
     fig = go.Figure()
 
@@ -330,8 +329,7 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
     if not series_dict:
         fig.add_annotation(
             text="无可用数据", xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=14, color="gray"),
+            x=0.5, y=0.5, showarrow=False, font=dict(size=14, color="gray")
         )
         return fig
 
@@ -376,33 +374,36 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
         left_title = f"价格（{left_unit}）"
         right_title = f"价格（{right_unit}）" if right_unit else "价格"
 
-    # ---- 【新增】计算 Y 轴范围，强制左右比例一致 ----
+    # ---- 计算 Y 轴范围，强制相对波动率一致 ----
     left_series = series_dict[left_ticker].dropna()
     L_min, L_max = left_series.min(), left_series.max()
     L_mid = (L_max + L_min) / 2
-    L_range = L_max - L_min
+    L_ratio = (L_max - L_min) / L_mid if L_mid != 0 else 1.0
     
-    if L_range == 0:
-        L_range = L_mid * 0.1 if L_mid != 0 else 1.0
+    y_range_L = None
+    y_range_R = None
 
-    L_ratio = L_range / L_mid if L_mid != 0 else 1.0
-    y_range_L = [L_mid - (L_range / 2) * 1.05, L_mid + (L_range / 2) * 1.05]
-    
     if right_tickers:
         all_right = pd.concat([series_dict[t].dropna() for t in right_tickers])
         R_min, R_max = all_right.min(), all_right.max()
         R_mid = (R_max + R_min) / 2
-        
-        target_R_range = R_mid * L_ratio if R_mid != 0 else (R_max - R_min)
-        if target_R_range == 0:
-            target_R_range = R_mid * 0.1 if R_mid != 0 else 1.0
-            
-        y_range_R = [R_mid - (target_R_range / 2) * 1.05, R_mid + (target_R_range / 2) * 1.05]
-    else:
-        y_range_R = None
+        R_ratio = (R_max - R_min) / R_mid if R_mid != 0 else 1.0
 
-    # ---- Pearson 相关系数（仅 2 个标的时） ----
-    corr_text = ""
+        # 取两者中更大的相对跨度，并留出 5% 的边距，保证两端都不越界
+        target_ratio = max(L_ratio, R_ratio) * 1.05
+        if target_ratio == 0:
+            target_ratio = 0.1
+
+        # 按照最大相对跨度，重新分配两边 Y 轴
+        y_range_L = [L_mid * (1 - target_ratio / 2), L_mid * (1 + target_ratio / 2)]
+        y_range_R = [R_mid * (1 - target_ratio / 2), R_mid * (1 + target_ratio / 2)]
+    else:
+        # 只有单边数据时
+        padding = (L_max - L_min) * 0.05 if L_max != L_min else 1.0
+        y_range_L = [L_min - padding, L_max + padding]
+
+    # ---- Pearson 相关系数（整合到标题中，解决重叠问题） ----
+    title_text = "MA5 双轴对比（比例同步）"
     if len(series_dict) == 2:
         try:
             labels = list(series_dict.keys())
@@ -412,22 +413,13 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
             }).dropna()
             if len(df_pair) > 5:
                 c = df_pair.corr().iloc[0, 1]
-                corr_text = f"MA5 Pearson 相关系数: {c:.3f}"
+                title_text += f"<br><span style='font-size:12px; color:#666;'>MA5 Pearson 相关系数: {c:.3f}</span>"
         except Exception:
             pass
 
-    if corr_text:
-        fig.add_annotation(
-            text=corr_text,
-            xref="paper", yref="paper", x=0.01, y=1.10,
-            showarrow=False,
-            font=dict(size=11, color="#666"),
-            xanchor="left",
-        )
-
     fig.update_layout(
         title=dict(
-            text="MA5 双轴对比（比例同步）",
+            text=title_text,
             font=dict(size=13 if mobile_mode else 16),
             x=0.5 if mobile_mode else 0,
             xanchor="center" if mobile_mode else "left",
@@ -452,7 +444,7 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
         margin=dict(
             l=40 if mobile_mode else 70,
             r=40 if mobile_mode else 70,
-            t=55 if mobile_mode else 90,
+            t=65 if mobile_mode else 90,  # 给标题加上相关系数留出高度
             b=35 if mobile_mode else 60,
         ),
         font=dict(size=10 if mobile_mode else 12),
