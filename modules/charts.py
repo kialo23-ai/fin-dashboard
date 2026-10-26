@@ -313,7 +313,7 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
     """
     MA5 双 Y 轴对比。
     直接基于原始收盘价计算 5 日均线，不做汇率换算。
-    量级最大的标的放左轴，其余放右轴；轴标题标注计价单位。
+    量级最大的标的放左轴，其余放右轴；强制左右比例同步以消除视觉失真。
     """
     fig = go.Figure()
 
@@ -376,6 +376,31 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
         left_title = f"价格（{left_unit}）"
         right_title = f"价格（{right_unit}）" if right_unit else "价格"
 
+    # ---- 【新增】计算 Y 轴范围，强制左右比例一致 ----
+    left_series = series_dict[left_ticker].dropna()
+    L_min, L_max = left_series.min(), left_series.max()
+    L_mid = (L_max + L_min) / 2
+    L_range = L_max - L_min
+    
+    if L_range == 0:
+        L_range = L_mid * 0.1 if L_mid != 0 else 1.0
+
+    L_ratio = L_range / L_mid if L_mid != 0 else 1.0
+    y_range_L = [L_mid - (L_range / 2) * 1.05, L_mid + (L_range / 2) * 1.05]
+    
+    if right_tickers:
+        all_right = pd.concat([series_dict[t].dropna() for t in right_tickers])
+        R_min, R_max = all_right.min(), all_right.max()
+        R_mid = (R_max + R_min) / 2
+        
+        target_R_range = R_mid * L_ratio if R_mid != 0 else (R_max - R_min)
+        if target_R_range == 0:
+            target_R_range = R_mid * 0.1 if R_mid != 0 else 1.0
+            
+        y_range_R = [R_mid - (target_R_range / 2) * 1.05, R_mid + (target_R_range / 2) * 1.05]
+    else:
+        y_range_R = None
+
     # ---- Pearson 相关系数（仅 2 个标的时） ----
     corr_text = ""
     if len(series_dict) == 2:
@@ -402,15 +427,24 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
 
     fig.update_layout(
         title=dict(
-            text="MA5 双轴对比",
+            text="MA5 双轴对比（比例同步）",
             font=dict(size=13 if mobile_mode else 16),
             x=0.5 if mobile_mode else 0,
             xanchor="center" if mobile_mode else "left",
         ),
-        yaxis=dict(title=left_title, side="left"),
+        yaxis=dict(
+            title=left_title, 
+            side="left", 
+            range=y_range_L,
+            tickformat=",.2f"
+        ),
         yaxis2=dict(
             title=right_title,
-            overlaying="y", side="right", showgrid=False,
+            overlaying="y", 
+            side="right", 
+            showgrid=False, 
+            range=y_range_R,
+            tickformat=",.2f"
         ),
         template="plotly_white",
         hovermode="x unified",
