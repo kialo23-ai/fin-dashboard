@@ -312,11 +312,10 @@ def plot_correlation_heatmap(data_dict: dict, mobile_mode: bool = False) -> go.F
 def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
     """
     MA5 双 Y 轴对比。
-    强制左右比例同步（按相对波动率），并将相关系数整合到标题避免重叠。
+    强制左右比例同步，并通过 autorange=False 防止移动端自动缩放导致数据溢出。
     """
     fig = go.Figure()
 
-    # 计算每个标的的 MA5
     series_dict = {}
     for ticker, df in data_dict.items():
         if df.empty or "Close" not in df.columns:
@@ -389,20 +388,18 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
         R_mid = (R_max + R_min) / 2
         R_ratio = (R_max - R_min) / R_mid if R_mid != 0 else 1.0
 
-        # 取两者中更大的相对跨度，并留出 5% 的边距，保证两端都不越界
-        target_ratio = max(L_ratio, R_ratio) * 1.05
+        # 取两者中更大的相对跨度，并留出 8% 的边距（加大边距防止移动端线贴边）
+        target_ratio = max(L_ratio, R_ratio) * 1.08
         if target_ratio == 0:
             target_ratio = 0.1
 
-        # 按照最大相对跨度，重新分配两边 Y 轴
         y_range_L = [L_mid * (1 - target_ratio / 2), L_mid * (1 + target_ratio / 2)]
         y_range_R = [R_mid * (1 - target_ratio / 2), R_mid * (1 + target_ratio / 2)]
     else:
-        # 只有单边数据时
-        padding = (L_max - L_min) * 0.05 if L_max != L_min else 1.0
+        padding = (L_max - L_min) * 0.08 if L_max != L_min else 1.0
         y_range_L = [L_min - padding, L_max + padding]
 
-    # ---- Pearson 相关系数（整合到标题中，解决重叠问题） ----
+    # ---- Pearson 相关系数 ----
     title_text = "MA5 双轴对比（比例同步）"
     if len(series_dict) == 2:
         try:
@@ -417,6 +414,9 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
         except Exception:
             pass
 
+    # 移动端取消千分位逗号，防止标签过长挤压图表
+    tick_fmt = None if mobile_mode else ",.2f"
+
     fig.update_layout(
         title=dict(
             text=title_text,
@@ -428,7 +428,8 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
             title=left_title, 
             side="left", 
             range=y_range_L,
-            tickformat=",.2f"
+            autorange=False,  # 关键：强制禁用自动缩放
+            tickformat=tick_fmt
         ),
         yaxis2=dict(
             title=right_title,
@@ -436,15 +437,16 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
             side="right", 
             showgrid=False, 
             range=y_range_R,
-            tickformat=",.2f"
+            autorange=False,  # 关键：强制禁用自动缩放
+            tickformat=tick_fmt
         ),
         template="plotly_white",
         hovermode="x unified",
         height=320 if mobile_mode else 500,
         margin=dict(
-            l=40 if mobile_mode else 70,
-            r=40 if mobile_mode else 70,
-            t=65 if mobile_mode else 90,  # 给标题加上相关系数留出高度
+            l=50 if mobile_mode else 70,  # 移动端稍微加大左边距给文字留空间
+            r=50 if mobile_mode else 70,
+            t=65 if mobile_mode else 90,
             b=35 if mobile_mode else 60,
         ),
         font=dict(size=10 if mobile_mode else 12),
@@ -455,5 +457,6 @@ def plot_ma5_dual_axis(data_dict: dict, mobile_mode: bool = False) -> go.Figure:
             font=dict(size=9 if mobile_mode else 11),
         ),
         autosize=True,
+        uirevision=True, # 保持用户缩放状态（如果用户手动缩放的话）
     )
     return fig
